@@ -107,6 +107,9 @@ def create_argparser () -> bool:
 	
 	return True
 
+#
+#	r e c o v e r _ f i l e
+#
 
 def recover_file (file_path: str, passphrase: str) -> bool:
 	
@@ -118,29 +121,61 @@ def recover_file (file_path: str, passphrase: str) -> bool:
 	# --recover <source_filename> [-target_filename | -t <path>] [-encryption_key | -e <key>] [-generate | -g <rebuild | datablocks | asis>] [-skipSchema | -r] [-skipStructure | -l] [-rebuildIndex | -i <now | later | false>] [-keepCaches | -k] [-bypass | -b] [-username | -u <username>] [-password | -p <password>]
 
 	file_name = os.path.basename (file_path)
+	file_dir = os.path.dirname (file_path)
 	
 	if file_name [-4:] != '.fmp12':
-		print ('"' + file_path + '"' + ' is not a FileMaker file' )
-		return false
+		print ('Warning: "' + file_name + '"' + ' may not be a FileMaker file and is being skipped' )
+		return None
 	
 	# TODO: use RE here instead so we only replace at end of string.
 	file_path_out = file_path.replace ('.fmp12', '_recovered.fmp12', 1)
 	
+	#try:
+	#	os.remove (file_dir + "Recover.log")
+	#except OSError as e:
+	#	pass
+
 	if passphrase == None:
 		output = subprocess.run (
 			[FMDT_COMMAND,
 			parent_dir, 
 			'--recover', file_path,
-			'-name', file_pattern],
+			'-target_filename', file_path_out],
 			capture_output=True
 		)
 	else:
-		# use EAR
+		# Passphrase will be ignored for any files that don't need it.
+		output = subprocess.run (
+			[FMDT_COMMAND,
+			parent_dir, 
+			'--recover', file_path,
+			'-target_filename', file_path_out,
+			'-encryption_key', passphrase],
+			capture_output=True
+		)
 	
+	print()
+	print (output.stdout)
+	print
+	
+	try:
+		os.remove (file_path_out)
+	except OSError as e:
+		print ('Error: no output file created for "' + file_name + '"')
+		return False
 
+	if output.returncode == 0:
+		# NO ACTION CURRENTLY
+		pass
+
+#
+#	M A I N
+#
 
 if __name__ == "__main__":
 
+	return_code = 0;
+	
 	create_argparser()
 	
 	arguments = ARGPARSER.parse_args()
@@ -155,12 +190,29 @@ if __name__ == "__main__":
 	if arguments.newest:
 		path = find_newest_dir (path)
 	
+	print ('Directory being used:', path)
+	
 	file_list = find_files (path, arguments.filepattern)
 
-	print (file_list)
+	if file_list == []:
+		print ('Error: no matching files found')
+		exit (-3)
+		
+	# Currently, remove an previous log. Instead, we'll accumulate the messages for
+	# all files. Later versions of this script we'll scan the logs after each recovery.
+	
+	try:
+		os.remove (path + "Recover.log")
+	except OSError as e:
+		pass
+
 	
 	for file in file_list:
-		
+		if recover_file (file, arguments.passphrase) == False:
+			return_code = -2
+			break
+
+	sys.exit (return_code)
 
 
 
