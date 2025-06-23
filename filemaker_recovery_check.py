@@ -16,10 +16,7 @@ FMDT_COMMAND = 'FMDeveloperTool'
 
 ARGPARSER: argparse = None
 
-#
-# list of corrupted file patterns to check file
-#
-CORRUPTED_FILE_PATTERNS = [
+corrupted_file_patterns = [
     "This item changed$",
     "Adjusted item count of library .* \(.*\) by .*",
     "Calculation modified$",
@@ -65,31 +62,29 @@ def find_files (parent_dir: str, file_pattern: str) -> list:
     return found_files
 
 
-def find_newest_dir (parent_dir: str) -> str:
+def find_newest_dir (parent_directory: str) -> str:
 
     """
     Of the directories in the parent directory, determine the newest directory
     and returns its path. Does not descend into sub-directories.
     """
 
-    from pathlib import Path
+    # check for subdirectories
+    subdirectories = []
+    for item in os.listdir(parent_directory):
+        item_path = os.path.join(parent_directory, item)
+        if os.path.isdir(item_path):
+            subdirectories.append(item_path)
 
-    parent = Path(parent_dir)
-    path_newest = None
+    # if subdirectories empty, return nothing
+    if not subdirectories:
+        return None
 
-    # assume we'll find dir at least as old as parent
-    mtime: float = Path.stat(p).st_mtime
 
-    # Iterate over all enclosed files or dirs,
-    # tracking the newest directory we see.
-
-    for f in parent.iterdir():
-        cur_mtime = f.stat().st_mtime
-
-        if f.is_dir() and cur_mtime >= mtime:
-           mtime = f.stat().st_mtime
-
-    return path_newest
+    # Sort subdirectories by modification time (mtime) in descending order
+    # os.path.getmtime returns the time of last modification as a float
+    newest_subdirectory = max(subdirectories, key=os.path.getmtime)
+    return newest_subdirectory
 
 
 def find_newest_files (parent_dir: str, file_pattern: str, recursive=False):
@@ -278,7 +273,7 @@ if __name__ == "__main__":
 
         # loop through patterns to check
         print(f"Reviewing recovery log for {file_path}")
-        for pattern in CORRUPTED_FILE_PATTERNS:
+        for pattern in corrupted_file_patterns:
             result = check_file_corruption(recovery_log_file, pattern)
             if result != None:
                 print(f"Found possible corruption for {file_path}. Triggered by the search pattern, {pattern}")
