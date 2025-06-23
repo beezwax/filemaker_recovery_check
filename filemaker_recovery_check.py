@@ -16,7 +16,7 @@ FMDT_COMMAND = 'FMDeveloperTool'
 
 ARGPARSER: argparse = None
 
-corrupted_file_patterns = [
+CORRUPTED_FILE_PATTERNS = [
     "This item changed$",
     "Adjusted item count of library .* \(.*\) by .*",
     "Calculation modified$",
@@ -118,6 +118,7 @@ def create_argparser () -> bool:
     ARGPARSER.add_argument('filepattern')
     ARGPARSER.add_argument('-n', '--newest', action="store_true", help='search using newest directory in path')
     ARGPARSER.add_argument('-p', '--passphrase', type=str, help='EAR passphrase')
+    ARGPARSER.add_argument('-v', '--verbose', action="store_true", help='Set verbose mode.')
 
     return True
 
@@ -140,8 +141,7 @@ def recover_file (file_path: str, parent_dir: str, passphrase: str) -> bool:
 
     # ignore files without the fmp12 extension
     if file_ext != 'fmp12':
-        print(file_ext)
-        print ('Warning: "' + file_name + '"' + ' may not be a FileMaker file and is being skipped' )
+        print ('Warning: "' + file_name + '"' + ' may not be a FileMaker file and is being skipped' ) if verbose else None
         return None
 
     # TODO: use RE here instead so we only replace at end of string.
@@ -164,7 +164,7 @@ def recover_file (file_path: str, parent_dir: str, passphrase: str) -> bool:
 
     # run command
     try:
-        print(f"Attempting to perform file recovery for {file_name}.\nRecovery file: {file_path_out}")
+        print(f"Attempting to perform file recovery for {file_name}.\nRecovery file: {file_path_out}") if verbose else None
         result = subprocess.run (
             fm_data_recovery_command,
             capture_output=True,
@@ -177,11 +177,11 @@ def recover_file (file_path: str, parent_dir: str, passphrase: str) -> bool:
         print(f"Stderr: {e.stderr}")
 
     # output log file
-    print(f"Recovery Log File: {recovery_log_file}")
+    print(f"Recovery Log File: {recovery_log_file}") if verbose else None
 
     # remove recovery file
     try:
-        print(f"Removing recovery file at {file_path_out}")
+        print(f"Removing recovery file at {file_path_out}") if verbose else None
         os.remove (file_path_out)
     except OSError as e:
         print ('Error: no output file created for "' + file_name + '"')
@@ -230,16 +230,14 @@ if __name__ == "__main__":
 
     arguments = ARGPARSER.parse_args()
 
-    #print (arguments.path)
-    #print (arguments.filepattern)
-    #print (arguments.newest)
-
     path = arguments.path
+
+    verbose = arguments.verbose
 
     if arguments.newest:
         path = find_newest_dir (path)
 
-    print ('Directory being used:', path)
+    print ('Directory being used:', path) if verbose else None
 
     file_list = find_files (path, arguments.filepattern)
 
@@ -272,16 +270,18 @@ if __name__ == "__main__":
         recovery_log_file = obj['recovery_log_file']
 
         # loop through patterns to check
-        print(f"Reviewing recovery log for {file_path}")
-        for pattern in corrupted_file_patterns:
+        print(f"Reviewing recovery log for {file_path}") if verbose else None
+        for pattern in CORRUPTED_FILE_PATTERNS:
             result = check_file_corruption(recovery_log_file, pattern)
             if result != None:
-                print(f"Found possible corruption for {file_path}. Triggered by the search pattern, {pattern}")
+                print(f"Found possible corruption for {file_path}. Triggered by the search pattern, {pattern}") if verbose else None
                 corrupted_checks.append(file_name)
 
         # alert if we found nothing
         if not corrupted_checks:
             print(f"No file corruption found for {file_path}")
+        else:
+            print("CORRUPTION FOUND: {file_path}")
 
     # DONE
     sys.exit (return_code)
